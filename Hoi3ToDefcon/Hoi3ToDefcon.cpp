@@ -10,6 +10,7 @@
 #include <map>
 #include <random>
 #include <boost/icl/type_traits/is_numeric.hpp>
+#include <boost/filesystem.hpp>
 
 #include "CImg.h"
 using namespace cimg_library;
@@ -26,15 +27,135 @@ bool is_number(const std::string& s)
 	return !s.empty() && std::find_if(s.begin(), s.end(), [](char c) { return !std::isdigit(c); }) == s.end();
 }
 
+bool copyDir(
+	boost::filesystem::path const & source,
+	boost::filesystem::path const & destination
+	)
+{
+	namespace fs = boost::filesystem;
+	try
+	{
+		// Check whether the function call is valid
+		if (
+			!fs::exists(source) ||
+			!fs::is_directory(source)
+			)
+		{
+			std::cerr << "Source directory " << source.string()
+				<< " does not exist or is not a directory." << '\n'
+				;
+			return false;
+		}
+		if (fs::exists(destination))
+		{
+			std::cerr << "Destination directory " << destination.string()
+				<< " already exists." << '\n'
+				;
+			return false;
+		}
+		// Create the destination directory
+		if (!fs::create_directory(destination))
+		{
+			std::cerr << "Unable to create destination directory"
+				<< destination.string() << '\n'
+				;
+			return false;
+		}
+	}
+	catch (fs::filesystem_error const & e)
+	{
+		std::cerr << e.what() << '\n';
+		return false;
+	}
+	// Iterate through the source directory
+	for (
+		fs::directory_iterator file(source);
+		file != fs::directory_iterator(); ++file
+		)
+	{
+		try
+		{
+			fs::path current(file->path());
+			if (fs::is_directory(current))
+			{
+				// Found directory: Recursion
+				if (
+					!copyDir(
+					current,
+					destination / current.filename()
+					)
+					)
+				{
+					return false;
+				}
+			}
+			else
+			{
+				// Found file: Copy
+				fs::copy_file(
+					current,
+					destination / current.filename()
+					);
+			}
+		}
+		catch (fs::filesystem_error const & e)
+		{
+			std::cerr << e.what() << '\n';
+		}
+	}
+	return true;
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {
-	Object* SaveFile = doParseFile("D:\\Files\\hoi3_to_defcon\\Tupiniquim1944_09_17_00.hoi3");
+	std::string sSave = "";
+	std::string sName = "";
+	std::string sHoi3Dir = "";
+	std::string sHoi3ModDir = "";
+	std::string sDefconDir = "";
 
+	Object* ConfigFile = doParseFile("configuration.txt");
+	std::vector<Object*> Configs = ConfigFile->getValue("configuration");
+	Object* Config = Configs.at(0);
+	for (auto ConfigLeaf : Config->getLeaves())
+	{
+		if (ConfigLeaf->getKey() == "save")
+			sSave = ConfigLeaf->getLeaf();
+		else if (ConfigLeaf->getKey() == "HOI3directory")
+			sHoi3Dir = ConfigLeaf->getLeaf();
+		else if (ConfigLeaf->getKey() == "HOI3ModDirectory")
+			sHoi3ModDir = ConfigLeaf->getLeaf();
+		else if (ConfigLeaf->getKey() == "DEFCONdirectory")
+			sDefconDir = ConfigLeaf->getLeaf();
+	}
+
+	boost::filesystem::path SavePath(sSave);
+	boost::filesystem::path Hoi3Path(sHoi3Dir);
+	boost::filesystem::path DefconPath(sDefconDir);
+	boost::filesystem::path Hoi3ModPath(sHoi3ModDir);
+
+	sName = SavePath.stem().string();
+
+	boost::filesystem::path BaseModPath = "basemod";
+	boost::filesystem::path OutputPath = "output";
+	boost::filesystem::create_directories(OutputPath);
+
+	OutputPath = OutputPath / sName;
+	boost::filesystem::remove_all(OutputPath);
+	copyDir(BaseModPath, OutputPath);
+
+	Object* SaveFile = doParseFile(SavePath.string().c_str());
+	
 	///
 
 	std::map< int, std::pair<double, double> > ProvincePositions;
+	boost::filesystem::path Hoi3MapPositions = Hoi3ModPath / "map" / "positions.txt";
+	if (false == boost::filesystem::exists(Hoi3MapPositions))
+	{
+		Hoi3MapPositions = Hoi3Path / "map" / "positions.txt";
+	}
 
-	Object* positions = doParseFile("D:\\Files\\hoi3_to_defcon\\positions.txt");
+	Object* positions = doParseFile(Hoi3MapPositions.string().c_str());
 	std::vector<Object*> positionLeaves = positions->getLeaves();
 	for (Object* Leaf : positionLeaves)
 	{
@@ -183,10 +304,20 @@ int _tmain(int argc, _TCHAR* argv[])
 	);
 	
 	std::vector< std::vector<std::string> > ProvinceNamesFile;
-	ParseCsvFile(ProvinceNamesFile, "D:\\Files\\hoi3_to_defcon\\province_names.csv");
+	boost::filesystem::path ProvinceNamesCsvPath = Hoi3ModPath / "localisation" / "province_names.csv";
+	if (false == boost::filesystem::exists(ProvinceNamesCsvPath))
+	{
+		ProvinceNamesCsvPath = Hoi3Path / "localisation" / "province_names.csv";
+	}
+	ParseCsvFile(ProvinceNamesFile, ProvinceNamesCsvPath.string().c_str());
 
 	std::vector< std::vector<std::string> > CountryNamesFile;
-	ParseCsvFile(CountryNamesFile, "D:\\Files\\hoi3_to_defcon\\countries.csv");
+	boost::filesystem::path CountriesCsvPath = Hoi3ModPath / "localisation" / "countries.csv";
+	if (false == boost::filesystem::exists(CountriesCsvPath))
+	{
+		CountriesCsvPath = Hoi3Path / "localisation" / "countries.csv";
+	}
+	ParseCsvFile(CountryNamesFile, CountriesCsvPath.string().c_str());
 
 	std::map<int, std::string> ProvinceNames;
 	std::map<std::string, std::string> CountryNames;
@@ -204,7 +335,8 @@ int _tmain(int argc, _TCHAR* argv[])
 		CountryNames[NameLine[0]] = NameLine[1];
 	}
 
-	std::ofstream CitiesDat ("D:\\Files\\hoi3_to_defcon\\cities.dat");
+	boost::filesystem::path CitiesDatPath = OutputPath / "data" / "earth" / "cities.dat";
+	std::ofstream CitiesDat(CitiesDatPath.string().c_str());
 
 	for (auto i = SortedCityScores.begin(); i != SortedCityScores.end(); ++i)
 	{
@@ -244,7 +376,14 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	std::vector< std::vector<std::string> > Definitions;
 	std::map<ColourTriplet, int> ColourToId;
-	ParseCsvFile(Definitions, "D:\\Files\\hoi3_to_defcon\\definition.csv");
+
+	boost::filesystem::path DefinitionCsvPath = Hoi3ModPath / "map" / "definition.csv";
+	if (false == boost::filesystem::exists(DefinitionCsvPath))
+	{
+		DefinitionCsvPath = Hoi3Path / "map" / "definition.csv";
+	}
+
+	ParseCsvFile(Definitions, DefinitionCsvPath.string().c_str());
 
 	for (auto Line : Definitions)
 	{
@@ -257,11 +396,20 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	///
 
-	CImg<unsigned char> Landbase("D:\\Files\\hoi3_to_defcon\\Land_base.bmp");
-	CImg<unsigned char> Sailable("D:\\Files\\hoi3_to_defcon\\sailable.bmp");
-	CImg<unsigned char> Coastlines("D:\\Files\\hoi3_to_defcon\\coastlines.bmp");
+	boost::filesystem::path LandbasePath = OutputPath / "data" / "earth" / "land_base.bmp";
+	boost::filesystem::path SailablePath = OutputPath / "data" / "earth" / "sailable.bmp";
+	boost::filesystem::path CoastlinesPath = OutputPath / "data" / "earth" / "coastlines.bmp";
 
-	CImg<unsigned char> ProvinceMapFromFile("D:\\Files\\hoi3_to_defcon\\provinces.bmp");
+	CImg<unsigned char> Landbase(LandbasePath.string().c_str());
+	CImg<unsigned char> Sailable(SailablePath.string().c_str());
+	CImg<unsigned char> Coastlines(CoastlinesPath.string().c_str());
+
+	boost::filesystem::path HoiProvinceMapPath = Hoi3ModPath / "map" / "provinces.bmp";
+	if (false == boost::filesystem::exists(HoiProvinceMapPath))
+	{
+		HoiProvinceMapPath = Hoi3Path / "map" / "provinces.bmp";
+	}
+	CImg<unsigned char> ProvinceMapFromFile(HoiProvinceMapPath.string().c_str());
 	ProvinceMapFromFile.resize(512, 200, 1, 3, 1);
 	ProvinceMapFromFile.mirror('y');
 
@@ -330,6 +478,15 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::get<1>(TerritoryMaps[i]) |= std::get<2>(TerritoryMaps[i]);
 	}
 
+	std::vector<boost::filesystem::path> ContinentPaths = {
+		OutputPath / "data" / "earth" / "africa.bmp",
+		OutputPath / "data" / "earth" / "europe.bmp",
+		OutputPath / "data" / "earth" / "northamerica.bmp",
+		OutputPath / "data" / "earth" / "russia.bmp",
+		OutputPath / "data" / "earth" / "southamerica.bmp",
+		OutputPath / "data" / "earth" / "southasia.bmp"
+	};
+
 	for (int i = 0; i < 6; i++)
 	{
 		/*
@@ -339,13 +496,19 @@ int _tmain(int argc, _TCHAR* argv[])
 			show2.wait();
 		*/
 		std::get<1>(TerritoryMaps[i]).blur(1);
-		std::get<1>(TerritoryMaps[i]).save("D:\\Files\\hoi3_to_defcon\\plates\\continent.bmp", i);
+		std::get<1>(TerritoryMaps[i]).save(ContinentPaths[i].string().c_str());
 	}
 
 	///
 
 
-	CImg<unsigned char> BigProvinceMap("D:\\Files\\hoi3_to_defcon\\provinces.bmp");
+	boost::filesystem::path BigHoiProvinceMapPath = Hoi3ModPath / "map" / "provinces.bmp";
+	if (false == boost::filesystem::exists(BigHoiProvinceMapPath))
+	{
+		BigHoiProvinceMapPath = Hoi3Path / "map" / "provinces.bmp";
+	}
+	CImg<unsigned char> BigProvinceMap(BigHoiProvinceMapPath.string().c_str());
+	
 	BigProvinceMap.mirror('y');
 
 	std::map<std::string, ColourTriplet> TmpNationColours;
@@ -413,7 +576,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 	}
 
-	BigProvinceMap.save("D:\\Files\\hoi3_to_defcon\\newnations.bmp");
+	//
 
 	GetEdges Edges;
 	Edges.Init(&BigProvinceMap);
@@ -421,7 +584,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::set< std::tuple<int, int, int> > GotColours;
 	Edges.GetAllColours(GotColours);
 
-	std::ofstream InternationalDat ("D:\\Files\\hoi3_to_defcon\\international.dat");
+	boost::filesystem::path InternationalDatPath = OutputPath / "data" / "earth" / "international.dat";
+	std::ofstream InternationalDat(InternationalDatPath.string().c_str());
 
 	bool lastB = false;
 	for (auto GotColour : GotColours)

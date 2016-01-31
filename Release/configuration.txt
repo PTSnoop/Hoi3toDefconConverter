@@ -1,0 +1,8 @@
+configuration = {
+    save = "Tupiniquim1944_09_17_00.hoi3"
+    HOI3directory = "D:\Steam\steamapps\common\Hearts of Iron 3"
+    DEFCONdirectory = "D:\Steam\steamapps\common\defcon"
+    
+    #superpowers = "powerful"
+    #superpowers = "factions" # TODO
+}
