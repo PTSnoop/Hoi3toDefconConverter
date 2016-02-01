@@ -22,18 +22,11 @@ using namespace cimg_library;
 
 #include "Configuration.h"
 
-int _tmain(int argc, _TCHAR* argv[])
+auto real_rand = std::bind(std::uniform_real_distribution<double>(0.0, 1.0), mt19937(12345));
+
+bool GetProvincePositions(std::map< int, std::pair<double, double> >& ProvincePositions)
 {
 	Configuration& Config = Configuration::Get();
-	Config.Init("configuration.txt");
-
-	Object* SaveFile = doParseFile(Config.GetSavePath().string().c_str());
-
-	Config.CreateDirectories();
-
-	///
-
-	std::map< int, std::pair<double, double> > ProvincePositions;
 	boost::filesystem::path Hoi3MapPositions = Config.GetModdedHoi3File("map/positions.txt");
 
 	Object* positions = doParseFile(Hoi3MapPositions.string().c_str());
@@ -75,37 +68,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		ProvincePositions[atoi(sProvinceId.c_str())] = std::make_pair(atof(x.c_str()), atof(y.c_str()));
 	}
 
+	return true;
+}
 
-	double minX = 9999.9;
-	double minY = 9999.9;
-	double maxX = -9999.9;
-	double maxY = -9999.9;
-	for (auto pair : ProvincePositions)
-	{
-		double x = pair.second.first;
-		double y = pair.second.second;
-
-		if (x < minX)
-			minX = x;
-		if (y < minY)
-			minY = y;
-
-		if (x > maxX)
-			maxX = x;
-		if (y > maxY)
-			maxY = y;
-	}
-
-	///
-
-	std::map<int, std::string> Territories;
-	std::map<std::string, int> TerritoryCounts;
-	std::map<int, double> CityScore;
-	std::map<int, bool> Capitals;
-
+bool GetProvinceNumbers(std::map<int, std::string>& Territories, std::map<std::string, int>& TerritoryCounts, std::map<int, double>& CityScore, std::map<int, bool>& Capitals, Object* SaveFile)
+{
 	std::string sSeed = SaveFile->getLeaf("seed");
 	int iSeed = atoi(sSeed.c_str());
-	auto real_rand = std::bind(std::uniform_real_distribution<double>(0.0, 1.0), mt19937(iSeed));
+	real_rand = std::bind(std::uniform_real_distribution<double>(0.0, 1.0), mt19937(iSeed));
 
 	std::vector<Object*> Leaves = SaveFile->getLeaves();
 	for (Object* Leaf : Leaves)
@@ -159,30 +129,12 @@ int _tmain(int argc, _TCHAR* argv[])
 			CityScore[iProvinceId] = floor(fScore);
 		}
 	}
+	return true;
+}
 
-
-
-	std::vector<pair<std::string, int>> SortedTerritoryCounts;
-	for (auto itr = TerritoryCounts.begin(); itr != TerritoryCounts.end(); ++itr)
-		SortedTerritoryCounts.push_back(*itr);
-
-	sort(
-		SortedTerritoryCounts.begin(), SortedTerritoryCounts.end(), [=](pair<std::string, int>& a, pair<std::string, int>& b)
-	{
-		return a.second > b.second;
-	}
-	);
-
-	std::vector<pair<int, double>> SortedCityScores;
-	for (auto itr = CityScore.begin(); itr != CityScore.end(); ++itr)
-		SortedCityScores.push_back(*itr);
-
-	sort(
-		SortedCityScores.begin(), SortedCityScores.end(), [=](pair<int, double>& a, pair<int, double>& b)
-	{
-		return a.second > b.second;
-	}
-	);
+bool GetLocalisation(std::map<int, std::string>& ProvinceNames, std::map<std::string, std::string>& CountryNames)
+{
+	Configuration& Config = Configuration::Get();
 
 	std::vector< std::vector<std::string> > ProvinceNamesFile;
 	boost::filesystem::path ProvinceNamesCsvPath = Config.GetModdedHoi3File("localisation/province_names.csv");
@@ -191,9 +143,6 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::vector< std::vector<std::string> > CountryNamesFile;
 	boost::filesystem::path CountriesCsvPath = Config.GetModdedHoi3File("localisation/countries.csv");
 	ParseCsvFile(CountryNamesFile, CountriesCsvPath.string().c_str());
-
-	std::map<int, std::string> ProvinceNames;
-	std::map<std::string, std::string> CountryNames;
 
 	for (auto NameLine : ProvinceNamesFile)
 	{
@@ -207,6 +156,18 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (NameLine.size() < 2) continue;
 		CountryNames[NameLine[0]] = NameLine[1];
 	}
+
+	return true;
+}
+
+bool CreateCitiesFile(std::vector< pair<int, double> >& SortedCityScores,
+	std::map<int, std::string>& Territories,
+	std::map<std::string, std::string>& CountryNames,
+	std::map<int, std::string>& ProvinceNames,
+	std::map< int, std::pair<double, double> >& ProvincePositions,
+	std::map<int, bool>& Capitals)
+{
+	Configuration& Config = Configuration::Get();
 
 	boost::filesystem::path CitiesDatPath = Config.GetOutputPath() / "data" / "earth" / "cities.dat";
 	std::ofstream CitiesDat(CitiesDatPath.string().c_str());
@@ -245,10 +206,12 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	CitiesDat.close();
 
-	///
+}
 
+bool GetProvinceColourIds(std::map<ColourTriplet, int>& ColourToId)
+{
+	Configuration& Config = Configuration::Get();
 	std::vector< std::vector<std::string> > Definitions;
-	std::map<ColourTriplet, int> ColourToId;
 
 	boost::filesystem::path DefinitionCsvPath = Config.GetModdedHoi3File("map/definition.csv");
 	ParseCsvFile(Definitions, DefinitionCsvPath.string().c_str());
@@ -261,8 +224,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		ColourTriplet c(atoi(Line[1].c_str()), atoi(Line[2].c_str()), atoi(Line[3].c_str()));
 		ColourToId[c] = atoi(Line[0].c_str());
 	}
+	return true;
+}
 
-	///
+bool CreateTerritoryMaps(std::vector< pair<std::string, int> >& SortedTerritoryCounts, std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
+{
+	Configuration& Config = Configuration::Get();
 
 	boost::filesystem::path LandbasePath = Config.GetOutputPath() / "data" / "earth" / "land_base.bmp";
 	boost::filesystem::path SailablePath = Config.GetOutputPath() / "data" / "earth" / "sailable.bmp";
@@ -280,15 +247,8 @@ int _tmain(int argc, _TCHAR* argv[])
 	CImg<unsigned char> ProvinceMap(512, 285, 1, 3, 0);
 	ProvinceMap.draw_image(0, 26, ProvinceMapFromFile);
 
-	/*
-	CImgDisplay show(ProvinceMap, "ProvinceMap");
-
-	while (!show.is_closed())
-	show.wait();
-	*/
-
 	std::vector< std::tuple< std::string, CImg<unsigned char>, CImg<unsigned char> > > TerritoryMaps;
-	std::vector< std::string > RelevantTags;
+	//std::vector< std::string > RelevantTags;
 	for (int i = 0; i < 6; i++)
 	{
 		std::string sRelevant = SortedTerritoryCounts[i].first;
@@ -354,29 +314,18 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	for (int i = 0; i < 6; i++)
 	{
-		/*
-		CImgDisplay show2(std::get<1>(TerritoryMaps[i]), "ProvinceMap");
-
-		while (!show2.is_closed())
-		show2.wait();
-		*/
 		std::get<1>(TerritoryMaps[i]).blur(1);
 		std::get<1>(TerritoryMaps[i]).save(ContinentPaths[i].string().c_str());
 	}
-
-	/*
-	///
-	CreateInternationalBoundaries();
-	return 0;
 }
 
-void CreateInternationalBoundaries()
-{
-*/
 
+void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
+{
+	Configuration& Config = Configuration::Get();
 	boost::filesystem::path BigHoiProvinceMapPath = Config.GetModdedHoi3File("map/provinces.bmp");
 	CImg<unsigned char> BigProvinceMap(BigHoiProvinceMapPath.string().c_str());
-	
+
 	BigProvinceMap.mirror('y');
 
 	std::map<std::string, ColourTriplet> TmpNationColours;
@@ -435,8 +384,8 @@ void CreateInternationalBoundaries()
 			if (real_rand() > 0.0002) continue;
 
 			std::cout << x << "\t" << y << std::endl;
-			const unsigned char newcolour[] = { 
-				BigProvinceMap(x, y, 0, 0) + (10.0 * real_rand()) - 5.0, 
+			const unsigned char newcolour[] = {
+				BigProvinceMap(x, y, 0, 0) + (10.0 * real_rand()) - 5.0,
 				BigProvinceMap(x, y, 0, 1) + (10.0 * real_rand()) - 5.0,
 				BigProvinceMap(x, y, 0, 2) + (10.0 * real_rand()) - 5.0
 			};
@@ -468,10 +417,10 @@ void CreateInternationalBoundaries()
 		Edges.Get(Points, GotColour);
 		for (std::pair<double, double>& Point : Points)
 		{
-			if (Point.first < 0 && Point.second < 0) 
+			if (Point.first < 0 && Point.second < 0)
 			{
 				if (!lastB)
-				InternationalDat << "b" << std::endl;
+					InternationalDat << "b" << std::endl;
 				lastB = true;
 			}
 			else
@@ -485,7 +434,58 @@ void CreateInternationalBoundaries()
 	}
 
 	InternationalDat.close();
+}
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	Configuration& Config = Configuration::Get();
+	Config.Init("configuration.txt");
+
+	Object* SaveFile = doParseFile(Config.GetSavePath().string().c_str());
+
+	Config.CreateDirectories();
+
+	std::map< int, std::pair<double, double> > ProvincePositions;
+	GetProvincePositions(ProvincePositions);
+	
+	std::map<int, std::string> Territories;
+	std::map<std::string, int> TerritoryCounts;
+	std::map<int, double> CityScore;
+	std::map<int, bool> Capitals;
+	GetProvinceNumbers(Territories, TerritoryCounts, CityScore, Capitals, SaveFile);
+	
+	std::vector<pair<std::string, int>> SortedTerritoryCounts;
+	for (auto itr = TerritoryCounts.begin(); itr != TerritoryCounts.end(); ++itr)
+		SortedTerritoryCounts.push_back(*itr);
+
+	sort(
+		SortedTerritoryCounts.begin(), 
+		SortedTerritoryCounts.end(), 
+		[=](pair<std::string, int>& a, pair<std::string, int>& b)
+			{ return a.second > b.second; }
+	);
+
+	std::vector<pair<int, double>> SortedCityScores;
+	for (auto itr = CityScore.begin(); itr != CityScore.end(); ++itr)
+		SortedCityScores.push_back(*itr);
+
+	sort(
+		SortedCityScores.begin(), 
+		SortedCityScores.end(), 
+		[=](pair<int, double>& a, pair<int, double>& b)
+			{ return a.second > b.second; }
+	);
+
+	std::map<ColourTriplet, int> ColourToId;
+	GetProvinceColourIds(ColourToId);
+
+	std::map<int, std::string> ProvinceNames;
+	std::map<std::string, std::string> CountryNames;
+	GetLocalisation(ProvinceNames, CountryNames);
+
+	CreateCitiesFile(SortedCityScores, Territories, CountryNames, ProvinceNames, ProvincePositions, Capitals);
+	CreateTerritoryMaps(SortedTerritoryCounts,ColourToId,Territories);
+	CreateInternationalBoundaries(ColourToId, Territories);
 
 	return 0;
 }
-
