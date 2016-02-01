@@ -4,7 +4,6 @@
 #include "stdafx.h"
 
 #include <algorithm>
-#include <cctype>
 #include <iostream>
 #include <fstream>
 #include <map>
@@ -15,145 +14,27 @@
 #include "CImg.h"
 using namespace cimg_library;
 
+#include "Utils.h"
 #include "Object.h"
 #include "Parser.h"
 #include "CsvParser.h"
 #include "GetEdges.h"
 
-typedef std::tuple<unsigned char, unsigned char, unsigned char> ColourTriplet;
-
-bool is_number(const std::string& s)
-{
-	return !s.empty() && std::find_if(s.begin(), s.end(), [](char c) { return !std::isdigit(c); }) == s.end();
-}
-
-bool copyDir(
-	boost::filesystem::path const & source,
-	boost::filesystem::path const & destination
-	)
-{
-	namespace fs = boost::filesystem;
-	try
-	{
-		// Check whether the function call is valid
-		if (
-			!fs::exists(source) ||
-			!fs::is_directory(source)
-			)
-		{
-			std::cerr << "Source directory " << source.string()
-				<< " does not exist or is not a directory." << '\n'
-				;
-			return false;
-		}
-		if (fs::exists(destination))
-		{
-			std::cerr << "Destination directory " << destination.string()
-				<< " already exists." << '\n'
-				;
-			return false;
-		}
-		// Create the destination directory
-		if (!fs::create_directory(destination))
-		{
-			std::cerr << "Unable to create destination directory"
-				<< destination.string() << '\n'
-				;
-			return false;
-		}
-	}
-	catch (fs::filesystem_error const & e)
-	{
-		std::cerr << e.what() << '\n';
-		return false;
-	}
-	// Iterate through the source directory
-	for (
-		fs::directory_iterator file(source);
-		file != fs::directory_iterator(); ++file
-		)
-	{
-		try
-		{
-			fs::path current(file->path());
-			if (fs::is_directory(current))
-			{
-				// Found directory: Recursion
-				if (
-					!copyDir(
-					current,
-					destination / current.filename()
-					)
-					)
-				{
-					return false;
-				}
-			}
-			else
-			{
-				// Found file: Copy
-				fs::copy_file(
-					current,
-					destination / current.filename()
-					);
-			}
-		}
-		catch (fs::filesystem_error const & e)
-		{
-			std::cerr << e.what() << '\n';
-		}
-	}
-	return true;
-}
+#include "Configuration.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	std::string sSave = "";
-	std::string sName = "";
-	std::string sHoi3Dir = "";
-	std::string sHoi3ModDir = "";
-	std::string sDefconDir = "";
+	Configuration& Config = Configuration::Get();
+	Config.Init("configuration.txt");
 
-	Object* ConfigFile = doParseFile("configuration.txt");
-	std::vector<Object*> Configs = ConfigFile->getValue("configuration");
-	Object* Config = Configs.at(0);
-	for (auto ConfigLeaf : Config->getLeaves())
-	{
-		if (ConfigLeaf->getKey() == "save")
-			sSave = ConfigLeaf->getLeaf();
-		else if (ConfigLeaf->getKey() == "HOI3directory")
-			sHoi3Dir = ConfigLeaf->getLeaf();
-		else if (ConfigLeaf->getKey() == "HOI3ModDirectory")
-			sHoi3ModDir = ConfigLeaf->getLeaf();
-		else if (ConfigLeaf->getKey() == "DEFCONdirectory")
-			sDefconDir = ConfigLeaf->getLeaf();
-	}
+	Object* SaveFile = doParseFile(Config.GetSavePath().string().c_str());
 
-	boost::filesystem::path SavePath(sSave);
-	boost::filesystem::path Hoi3Path(sHoi3Dir);
-	boost::filesystem::path DefconPath(sDefconDir);
-	boost::filesystem::path Hoi3ModPath(sHoi3ModDir);
+	Config.CreateDirectories();
 
-	sName = SavePath.stem().string();
-
-	boost::filesystem::path BaseModPath = "basemod";
-	boost::filesystem::path OutputPath = "output";
-	boost::filesystem::create_directories(OutputPath);
-
-	OutputPath = OutputPath / sName;
-	boost::filesystem::remove_all(OutputPath);
-	copyDir(BaseModPath, OutputPath);
-
-	Object* SaveFile = doParseFile(SavePath.string().c_str());
-	
 	///
 
 	std::map< int, std::pair<double, double> > ProvincePositions;
-	boost::filesystem::path Hoi3MapPositions = Hoi3ModPath / "map" / "positions.txt";
-	if (false == boost::filesystem::exists(Hoi3MapPositions))
-	{
-		Hoi3MapPositions = Hoi3Path / "map" / "positions.txt";
-	}
+	boost::filesystem::path Hoi3MapPositions = Config.GetModdedHoi3File("map/positions.txt");
 
 	Object* positions = doParseFile(Hoi3MapPositions.string().c_str());
 	std::vector<Object*> positionLeaves = positions->getLeaves();
@@ -169,10 +50,10 @@ int _tmain(int argc, _TCHAR* argv[])
 			{
 				if (Subsubleaf->getKey() == "x")
 					x = Subsubleaf->getLeaf();
-				
+
 				if (Subsubleaf->getKey() == "y")
 					y = Subsubleaf->getLeaf();
-				
+
 				for (auto Subsubsubleaf : Subsubleaf->getLeaves())
 				{
 					if (!x.empty() && !y.empty())
@@ -238,7 +119,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (Owners.empty())
 			continue;
 		std::string sOwner = Owners.at(0)->getLeaf();
-		
+
 		Territories[iProvinceId] = sOwner;
 		TerritoryCounts[sOwner]++;
 
@@ -249,7 +130,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::string sPoints = "0";
 		if (!Points.empty())
 			sPoints = Points.at(0)->getLeaf();
-		
+
 		double fInfras = 0.0;
 		std::vector<Object*> Infra = Leaf->getValue("infra");
 		if (!Infra.empty())
@@ -269,7 +150,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		fScore -= 10;
 		if (fScore > 0)
 		{
-			
+
 			fScore = pow(fScore, 1.5);
 			fScore *= 3e5;
 			if (Capitals[iProvinceId])
@@ -297,26 +178,18 @@ int _tmain(int argc, _TCHAR* argv[])
 		SortedCityScores.push_back(*itr);
 
 	sort(
-		SortedCityScores.begin(), SortedCityScores.end(), [=](pair<int,double>& a, pair<int,double>& b)
+		SortedCityScores.begin(), SortedCityScores.end(), [=](pair<int, double>& a, pair<int, double>& b)
 	{
 		return a.second > b.second;
 	}
 	);
-	
+
 	std::vector< std::vector<std::string> > ProvinceNamesFile;
-	boost::filesystem::path ProvinceNamesCsvPath = Hoi3ModPath / "localisation" / "province_names.csv";
-	if (false == boost::filesystem::exists(ProvinceNamesCsvPath))
-	{
-		ProvinceNamesCsvPath = Hoi3Path / "localisation" / "province_names.csv";
-	}
+	boost::filesystem::path ProvinceNamesCsvPath = Config.GetModdedHoi3File("localisation/province_names.csv");
 	ParseCsvFile(ProvinceNamesFile, ProvinceNamesCsvPath.string().c_str());
 
 	std::vector< std::vector<std::string> > CountryNamesFile;
-	boost::filesystem::path CountriesCsvPath = Hoi3ModPath / "localisation" / "countries.csv";
-	if (false == boost::filesystem::exists(CountriesCsvPath))
-	{
-		CountriesCsvPath = Hoi3Path / "localisation" / "countries.csv";
-	}
+	boost::filesystem::path CountriesCsvPath = Config.GetModdedHoi3File("localisation/countries.csv");
 	ParseCsvFile(CountryNamesFile, CountriesCsvPath.string().c_str());
 
 	std::map<int, std::string> ProvinceNames;
@@ -328,14 +201,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::string NameNumber = NameLine[0].substr(4);
 		ProvinceNames[atoi(NameNumber.c_str())] = NameLine[1];
 	}
-	
+
 	for (auto NameLine : CountryNamesFile)
 	{
 		if (NameLine.size() < 2) continue;
 		CountryNames[NameLine[0]] = NameLine[1];
 	}
 
-	boost::filesystem::path CitiesDatPath = OutputPath / "data" / "earth" / "cities.dat";
+	boost::filesystem::path CitiesDatPath = Config.GetOutputPath() / "data" / "earth" / "cities.dat";
 	std::ofstream CitiesDat(CitiesDatPath.string().c_str());
 
 	for (auto i = SortedCityScores.begin(); i != SortedCityScores.end(); ++i)
@@ -352,15 +225,15 @@ int _tmain(int argc, _TCHAR* argv[])
 		if (sProvinceName.empty())
 			continue;
 
-		std::string sX = std::to_string((360.0*(Pos.first/5616.0))-180.0);
-		std::string sY = std::to_string((138.0*(Pos.second/2160.0))-64.0+16.0-9.0);
+		std::string sX = std::to_string((360.0*(Pos.first / 5616.0)) - 180.0);
+		std::string sY = std::to_string((138.0*(Pos.second / 2160.0)) - 64.0 + 16.0 - 9.0);
 
 		unsigned long long llPopulation = i->second;
 		std::string sPopulation = std::to_string(llPopulation);
 		bool bIsCapital = Capitals[iProvinceId];
 
-		std::string sCityLine(125,' ');
-				
+		std::string sCityLine(125, ' ');
+
 		sCityLine.replace(0, sProvinceName.size(), sProvinceName);
 		sCityLine.replace(41, sCountryName.size(), sCountryName);
 		sCityLine.replace(82, sX.size(), sX);
@@ -377,12 +250,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::vector< std::vector<std::string> > Definitions;
 	std::map<ColourTriplet, int> ColourToId;
 
-	boost::filesystem::path DefinitionCsvPath = Hoi3ModPath / "map" / "definition.csv";
-	if (false == boost::filesystem::exists(DefinitionCsvPath))
-	{
-		DefinitionCsvPath = Hoi3Path / "map" / "definition.csv";
-	}
-
+	boost::filesystem::path DefinitionCsvPath = Config.GetModdedHoi3File("map/definition.csv");
 	ParseCsvFile(Definitions, DefinitionCsvPath.string().c_str());
 
 	for (auto Line : Definitions)
@@ -396,19 +264,15 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	///
 
-	boost::filesystem::path LandbasePath = OutputPath / "data" / "earth" / "land_base.bmp";
-	boost::filesystem::path SailablePath = OutputPath / "data" / "earth" / "sailable.bmp";
-	boost::filesystem::path CoastlinesPath = OutputPath / "data" / "earth" / "coastlines.bmp";
+	boost::filesystem::path LandbasePath = Config.GetOutputPath() / "data" / "earth" / "land_base.bmp";
+	boost::filesystem::path SailablePath = Config.GetOutputPath() / "data" / "earth" / "sailable.bmp";
+	boost::filesystem::path CoastlinesPath = Config.GetOutputPath() / "data" / "earth" / "coastlines.bmp";
 
 	CImg<unsigned char> Landbase(LandbasePath.string().c_str());
 	CImg<unsigned char> Sailable(SailablePath.string().c_str());
 	CImg<unsigned char> Coastlines(CoastlinesPath.string().c_str());
 
-	boost::filesystem::path HoiProvinceMapPath = Hoi3ModPath / "map" / "provinces.bmp";
-	if (false == boost::filesystem::exists(HoiProvinceMapPath))
-	{
-		HoiProvinceMapPath = Hoi3Path / "map" / "provinces.bmp";
-	}
+	boost::filesystem::path HoiProvinceMapPath = Config.GetModdedHoi3File("map/provinces.bmp");
 	CImg<unsigned char> ProvinceMapFromFile(HoiProvinceMapPath.string().c_str());
 	ProvinceMapFromFile.resize(512, 200, 1, 3, 1);
 	ProvinceMapFromFile.mirror('y');
@@ -420,9 +284,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	CImgDisplay show(ProvinceMap, "ProvinceMap");
 
 	while (!show.is_closed())
-		show.wait();
+	show.wait();
 	*/
-	
+
 	std::vector< std::tuple< std::string, CImg<unsigned char>, CImg<unsigned char> > > TerritoryMaps;
 	std::vector< std::string > RelevantTags;
 	for (int i = 0; i < 6; i++)
@@ -478,13 +342,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		std::get<1>(TerritoryMaps[i]) |= std::get<2>(TerritoryMaps[i]);
 	}
 
+	boost::filesystem::path OutputDataEarthPath = Config.GetOutputPath() / "data" / "earth";
 	std::vector<boost::filesystem::path> ContinentPaths = {
-		OutputPath / "data" / "earth" / "africa.bmp",
-		OutputPath / "data" / "earth" / "europe.bmp",
-		OutputPath / "data" / "earth" / "northamerica.bmp",
-		OutputPath / "data" / "earth" / "russia.bmp",
-		OutputPath / "data" / "earth" / "southamerica.bmp",
-		OutputPath / "data" / "earth" / "southasia.bmp"
+		OutputDataEarthPath / "africa.bmp",
+		OutputDataEarthPath / "europe.bmp",
+		OutputDataEarthPath / "northamerica.bmp",
+		OutputDataEarthPath / "russia.bmp",
+		OutputDataEarthPath / "southamerica.bmp",
+		OutputDataEarthPath / "southasia.bmp"
 	};
 
 	for (int i = 0; i < 6; i++)
@@ -493,20 +358,23 @@ int _tmain(int argc, _TCHAR* argv[])
 		CImgDisplay show2(std::get<1>(TerritoryMaps[i]), "ProvinceMap");
 
 		while (!show2.is_closed())
-			show2.wait();
+		show2.wait();
 		*/
 		std::get<1>(TerritoryMaps[i]).blur(1);
 		std::get<1>(TerritoryMaps[i]).save(ContinentPaths[i].string().c_str());
 	}
 
+	/*
 	///
+	CreateInternationalBoundaries();
+	return 0;
+}
 
+void CreateInternationalBoundaries()
+{
+*/
 
-	boost::filesystem::path BigHoiProvinceMapPath = Hoi3ModPath / "map" / "provinces.bmp";
-	if (false == boost::filesystem::exists(BigHoiProvinceMapPath))
-	{
-		BigHoiProvinceMapPath = Hoi3Path / "map" / "provinces.bmp";
-	}
+	boost::filesystem::path BigHoiProvinceMapPath = Config.GetModdedHoi3File("map/provinces.bmp");
 	CImg<unsigned char> BigProvinceMap(BigHoiProvinceMapPath.string().c_str());
 	
 	BigProvinceMap.mirror('y');
@@ -584,7 +452,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::set< std::tuple<int, int, int> > GotColours;
 	Edges.GetAllColours(GotColours);
 
-	boost::filesystem::path InternationalDatPath = OutputPath / "data" / "earth" / "international.dat";
+	boost::filesystem::path InternationalDatPath = Config.GetOutputPath() / "data" / "earth" / "international.dat";
 	std::ofstream InternationalDat(InternationalDatPath.string().c_str());
 
 	bool lastB = false;
