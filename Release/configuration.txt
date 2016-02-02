@@ -1,8 +1,15 @@
 configuration = {
-    save = "Tupiniquim1944_09_17_00.hoi3"
+    save = "Germany1941_06_22_00.hoi3"
     HOI3directory = "D:\Steam\steamapps\common\Hearts of Iron 3"
+    # HOI3ModDirectory = "D:\Steam\steamapps\common\Hearts of Iron 3\mod\Observe3"
     DEFCONdirectory = "D:\Steam\steamapps\common\defcon"
     
-    #superpowers = "powerful"
-    #superpowers = "factions" # TODO
+    superpowers = "factions" # powerful, factions, custom
+
+    side1 = {GER ITA}
+    side2 = {ENG FRA}
+    side3 = {SOV MON TAN}
+    side4 = {FIN NOR SWE DEN}
+    side5 = {JAP}
+    side6 = {USA}
 }

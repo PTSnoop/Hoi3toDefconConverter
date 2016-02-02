@@ -3,6 +3,8 @@
 #include <string>
 #include <boost/filesystem.hpp>
 
+enum Superpowers {Powerful, Factions, Custom};
+
 class Configuration
 {
 public:
@@ -23,6 +25,9 @@ public:
 
 	boost::filesystem::path GetModdedHoi3File(boost::filesystem::path TargetPath);
 
+	Superpowers GetSuperpowerOption();
+	std::vector< std::vector< std::string> > GetCustomSides();
+
 private:
 	Configuration();
 	Configuration(Configuration const&);  // Unimplemented
@@ -34,5 +39,8 @@ private:
 	boost::filesystem::path m_DefconPath;
 	boost::filesystem::path m_BaseModPath;
 	boost::filesystem::path m_OutputPath;
+
+	Superpowers m_SuperpowerOption;
+	std::vector< std::vector< std::string> > m_Sides;
 
 };

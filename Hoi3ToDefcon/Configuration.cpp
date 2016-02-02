@@ -11,6 +11,7 @@ Configuration::Configuration()
 , m_BaseModPath()
 , m_OutputPath()
 {
+	m_Sides = std::vector< std::vector< std::string> >( 6, std::vector<std::string>() );
 }
 
 bool Configuration::Init(std::string sConfigPath)
@@ -20,6 +21,7 @@ bool Configuration::Init(std::string sConfigPath)
 	std::string sHoi3Dir = "";
 	std::string sHoi3ModDir = "";
 	std::string sDefconDir = "";
+	std::string sSuperpowerOption = "";
 
 	Object* ConfigFile = doParseFile(sConfigPath.c_str());
 	std::vector<Object*> Configs = ConfigFile->getValue("configuration");
@@ -34,6 +36,26 @@ bool Configuration::Init(std::string sConfigPath)
 			sHoi3ModDir = ConfigLeaf->getLeaf();
 		else if (ConfigLeaf->getKey() == "DEFCONdirectory")
 			sDefconDir = ConfigLeaf->getLeaf();
+		else if (ConfigLeaf->getKey() == "superpowers")
+		{
+			sSuperpowerOption = ConfigLeaf->getLeaf();
+			if (sSuperpowerOption == "custom")
+				m_SuperpowerOption = Superpowers::Custom;
+			else if (sSuperpowerOption == "factions")
+				m_SuperpowerOption = Superpowers::Factions;
+			else
+				m_SuperpowerOption = Superpowers::Powerful;
+		}
+		else if (ConfigLeaf->getKey().substr(0, 4) == "side")
+		{
+			int index = atoi(ConfigLeaf->getKey().substr(4).c_str())-1;
+			if (index > 5) continue;
+
+			for (std::string Tag : ConfigLeaf->getTokens())
+			{
+				m_Sides[index].push_back(Tag);
+			}
+		}
 	}
 
 	m_SavePath = sSave;
@@ -79,3 +101,5 @@ boost::filesystem::path Configuration::GetHoi3Path() { return m_Hoi3Path; }
 boost::filesystem::path Configuration::GetHoi3ModPath() { return m_Hoi3ModPath; }
 boost::filesystem::path Configuration::GetBaseModPath() { return m_BaseModPath; }
 boost::filesystem::path Configuration::GetOutputPath() { return m_OutputPath; }
+Superpowers Configuration::GetSuperpowerOption() { return m_SuperpowerOption; };
+std::vector< std::vector<std::string> > Configuration::GetCustomSides() { return m_Sides; };

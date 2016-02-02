@@ -85,7 +85,7 @@ bool GetProvinceNumbers(std::map<int, std::string>& Territories, std::map<std::s
 			continue;
 		int iProvinceId = atoi(sProvinceId.c_str());
 
-		std::vector<Object*> Owners = Leaf->getValue("owner");
+		std::vector<Object*> Owners = Leaf->getValue("controller");
 		if (Owners.empty())
 			continue;
 		std::string sOwner = Owners.at(0)->getLeaf();
@@ -205,7 +205,7 @@ bool CreateCitiesFile(std::vector< pair<int, double> >& SortedCityScores,
 	}
 
 	CitiesDat.close();
-
+	return true;
 }
 
 bool GetProvinceColourIds(std::map<ColourTriplet, int>& ColourToId)
@@ -227,7 +227,61 @@ bool GetProvinceColourIds(std::map<ColourTriplet, int>& ColourToId)
 	return true;
 }
 
-bool CreateTerritoryMaps(std::vector< pair<std::string, int> >& SortedTerritoryCounts, std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
+bool GetSides(std::vector< std::vector< std::string > >& Sides, Object* SaveFile, std::vector< pair<std::string, int> >& SortedTerritoryCounts)
+{
+	Configuration& Config = Configuration::Get();
+	Sides = std::vector< std::vector< std::string> >(6, std::vector<std::string>());
+
+	switch (Config.GetSuperpowerOption())
+	{
+		case Superpowers::Custom:
+		{
+			Sides = std::vector< std::vector<std::string> >(Config.GetCustomSides());
+			break;
+		}
+		case Superpowers::Factions:
+		{
+			std::vector<Object*> Factions = SaveFile->getValue("faction")[0]->getLeaves();
+			std::vector<std::string> Added;
+			int i = 0;
+			for (; i < 3; i++)
+			{
+				for (auto CountryLeaf : Factions[i]->getLeaves())
+				{
+					if (CountryLeaf->getKey() == "country")
+					{
+						std::cout << CountryLeaf->getLeaf() << std::endl;
+						Sides[i].push_back(CountryLeaf->getLeaf());
+						Added.push_back(CountryLeaf->getLeaf());
+					}
+				}
+			}
+			for (auto NextLargest : SortedTerritoryCounts)
+			{
+				std::string sNextLargest = NextLargest.first;
+				if (std::find(Added.begin(), Added.end(), sNextLargest) == Added.end())
+				{
+					Sides[i].push_back(sNextLargest);
+					i++;
+					if (i >= 6) break;
+				}
+			}
+			break;
+		}
+		case Superpowers::Powerful:
+		{
+			for (int i = 0; i < 6; i++)
+			{
+				std::string sRelevant = SortedTerritoryCounts[i].first;
+				Sides[i].push_back(sRelevant);
+			}
+			break;
+		}
+	}
+	return true;
+}
+
+bool CreateTerritoryMaps(std::vector< std::vector< std::string > >& Sides, std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
 {
 	Configuration& Config = Configuration::Get();
 
@@ -247,14 +301,13 @@ bool CreateTerritoryMaps(std::vector< pair<std::string, int> >& SortedTerritoryC
 	CImg<unsigned char> ProvinceMap(512, 285, 1, 3, 0);
 	ProvinceMap.draw_image(0, 26, ProvinceMapFromFile);
 
-	std::vector< std::tuple< std::string, CImg<unsigned char>, CImg<unsigned char> > > TerritoryMaps;
+	std::vector< std::tuple< std::vector<std::string>, CImg<unsigned char>, CImg<unsigned char> > > TerritoryMaps;
 	//std::vector< std::string > RelevantTags;
 	for (int i = 0; i < 6; i++)
 	{
-		std::string sRelevant = SortedTerritoryCounts[i].first;
 		TerritoryMaps.push_back(
-			std::tuple< std::string, CImg<unsigned char>, CImg<unsigned char> >
-			(sRelevant, CImg<unsigned char>(512, 285, 1, 3, 0), CImg<unsigned char>(512, 285, 1, 3, 0))
+			std::tuple< std::vector<std::string>, CImg<unsigned char>, CImg<unsigned char> >
+			(Sides[i], CImg<unsigned char>(512, 285, 1, 3, 0), CImg<unsigned char>(512, 285, 1, 3, 0))
 			);
 	}
 
@@ -275,7 +328,8 @@ bool CreateTerritoryMaps(std::vector< pair<std::string, int> >& SortedTerritoryC
 
 			for (int i = 0; i < 6; i++)
 			{
-				if (std::get<0>(TerritoryMaps[i]) == sTag)
+				auto Relevants = std::get<0>(TerritoryMaps[i]);
+				if (std::find(Relevants.begin(), Relevants.end(), sTag) != Relevants.end())
 				{
 					if (0 == Landbase(x, y, 0, 0))
 						continue;
@@ -317,8 +371,8 @@ bool CreateTerritoryMaps(std::vector< pair<std::string, int> >& SortedTerritoryC
 		std::get<1>(TerritoryMaps[i]).blur(1);
 		std::get<1>(TerritoryMaps[i]).save(ContinentPaths[i].string().c_str());
 	}
+	return true;
 }
-
 
 void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
 {
@@ -443,6 +497,20 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	Object* SaveFile = doParseFile(Config.GetSavePath().string().c_str());
 
+#ifdef _DEBUG
+	std::vector< std::vector< std::string > > Sideses;
+	std::vector<pair<std::string, int>> SortedTerritoryCountses;
+
+	SortedTerritoryCountses.push_back(std::make_pair("SOV",3));
+	SortedTerritoryCountses.push_back(std::make_pair("ABC", 3));
+	SortedTerritoryCountses.push_back(std::make_pair("DEF", 3));
+	SortedTerritoryCountses.push_back(std::make_pair("GHI", 3));
+	SortedTerritoryCountses.push_back(std::make_pair("JKL", 3));
+
+	GetSides(Sideses, SaveFile, SortedTerritoryCountses);
+	return 0;
+#endif
+
 	Config.CreateDirectories();
 
 	std::map< int, std::pair<double, double> > ProvincePositions;
@@ -483,8 +551,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	std::map<std::string, std::string> CountryNames;
 	GetLocalisation(ProvinceNames, CountryNames);
 
+	std::vector< std::vector< std::string > > Sides;
+	GetSides(Sides, SaveFile, SortedTerritoryCounts);
+
 	CreateCitiesFile(SortedCityScores, Territories, CountryNames, ProvinceNames, ProvincePositions, Capitals);
-	CreateTerritoryMaps(SortedTerritoryCounts,ColourToId,Territories);
+	CreateTerritoryMaps(Sides,ColourToId,Territories);
 	CreateInternationalBoundaries(ColourToId, Territories);
 
 	return 0;
