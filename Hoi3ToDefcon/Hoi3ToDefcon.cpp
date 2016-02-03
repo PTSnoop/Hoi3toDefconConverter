@@ -15,6 +15,7 @@
 using namespace cimg_library;
 
 #include "Utils.h"
+#include "Log.h"
 #include "Object.h"
 #include "Parser.h"
 #include "CsvParser.h"
@@ -28,8 +29,19 @@ bool GetProvincePositions(std::map< int, std::pair<double, double> >& ProvincePo
 {
 	Configuration& Config = Configuration::Get();
 	boost::filesystem::path Hoi3MapPositions = Config.GetModdedHoi3File("map/positions.txt");
+	if (Hoi3MapPositions.empty())
+	{
+		LOG(LogLevel::Error) << "Could not find Hoi3 map/positions.txt";
+		return false;
+	}
 
 	Object* positions = doParseFile(Hoi3MapPositions.string().c_str());
+	if (nullptr == positions)
+	{
+		LOG(LogLevel::Error) << "Could not read " << Hoi3MapPositions.string();
+		return false;
+	}
+
 	std::vector<Object*> positionLeaves = positions->getLeaves();
 	for (Object* Leaf : positionLeaves)
 	{
@@ -65,6 +77,11 @@ bool GetProvincePositions(std::map< int, std::pair<double, double> >& ProvincePo
 				break;
 		}
 
+		if (false == is_number(sProvinceId.c_str()))
+		{
+			LOG(LogLevel::Warning) << "Confused by province number " << sProvinceId << " in Hoi3 map/positions.txt";
+			continue;
+		}
 		ProvincePositions[atoi(sProvinceId.c_str())] = std::make_pair(atof(x.c_str()), atof(y.c_str()));
 	}
 
@@ -74,8 +91,11 @@ bool GetProvincePositions(std::map< int, std::pair<double, double> >& ProvincePo
 bool GetProvinceNumbers(std::map<int, std::string>& Territories, std::map<std::string, int>& TerritoryCounts, std::map<int, double>& CityScore, std::map<int, bool>& Capitals, Object* SaveFile)
 {
 	std::string sSeed = SaveFile->getLeaf("seed");
-	int iSeed = atoi(sSeed.c_str());
-	real_rand = std::bind(std::uniform_real_distribution<double>(0.0, 1.0), mt19937(iSeed));
+	if (is_number(sSeed))
+	{
+		int iSeed = atoi(sSeed.c_str());
+		real_rand = std::bind(std::uniform_real_distribution<double>(0.0, 1.0), mt19937(iSeed));
+	}
 
 	std::vector<Object*> Leaves = SaveFile->getLeaves();
 	for (Object* Leaf : Leaves)
@@ -114,6 +134,7 @@ bool GetProvinceNumbers(std::map<int, std::string>& Territories, std::map<std::s
 			}
 		}
 
+		if (sPoints.empty()) continue;
 		double fPoints = atof(sPoints.c_str());
 		double fScore = (1.0 + log(fPoints + 1.0)) * (fInfras + 1.0) + real_rand();
 
@@ -138,16 +159,40 @@ bool GetLocalisation(std::map<int, std::string>& ProvinceNames, std::map<std::st
 
 	std::vector< std::vector<std::string> > ProvinceNamesFile;
 	boost::filesystem::path ProvinceNamesCsvPath = Config.GetModdedHoi3File("localisation/province_names.csv");
-	ParseCsvFile(ProvinceNamesFile, ProvinceNamesCsvPath.string().c_str());
+	if (ProvinceNamesCsvPath.empty())
+	{
+		LOG(LogLevel::Error) << "Could not find Hoi3 localisation/province_names.csv";
+		return false;
+	}
+
+	if (false == ParseCsvFile(ProvinceNamesFile, ProvinceNamesCsvPath.string().c_str()))
+	{
+		LOG(LogLevel::Error) << "Could not read " << ProvinceNamesCsvPath.string();
+		return false;
+	}
 
 	std::vector< std::vector<std::string> > CountryNamesFile;
 	boost::filesystem::path CountriesCsvPath = Config.GetModdedHoi3File("localisation/countries.csv");
-	ParseCsvFile(CountryNamesFile, CountriesCsvPath.string().c_str());
+	if (CountriesCsvPath.empty())
+	{
+		LOG(LogLevel::Error) << "Could not find Hoi3 localisation/countries.csv";
+		return false;
+	}
+
+	if (false == ParseCsvFile(CountryNamesFile, CountriesCsvPath.string().c_str()))
+	{
+		LOG(LogLevel::Error) << "Could not read " << CountriesCsvPath.string();
+		return false;
+	}
 
 	for (auto NameLine : ProvinceNamesFile)
 	{
 		if (NameLine.size() < 2) continue;
 		std::string NameNumber = NameLine[0].substr(4);
+		if (false == is_number(NameNumber))
+		{
+			continue;
+		}
 		ProvinceNames[atoi(NameNumber.c_str())] = NameLine[1];
 	}
 
@@ -171,6 +216,11 @@ bool CreateCitiesFile(std::vector< pair<int, double> >& SortedCityScores,
 
 	boost::filesystem::path CitiesDatPath = Config.GetOutputPath() / "data" / "earth" / "cities.dat";
 	std::ofstream CitiesDat(CitiesDatPath.string().c_str());
+	if (!CitiesDat )
+	{
+		LOG(LogLevel::Error) << "Could not write to " << CitiesDatPath.string();
+		return false;
+	}
 
 	for (auto i = SortedCityScores.begin(); i != SortedCityScores.end(); ++i)
 	{
@@ -214,7 +264,16 @@ bool GetProvinceColourIds(std::map<ColourTriplet, int>& ColourToId)
 	std::vector< std::vector<std::string> > Definitions;
 
 	boost::filesystem::path DefinitionCsvPath = Config.GetModdedHoi3File("map/definition.csv");
-	ParseCsvFile(Definitions, DefinitionCsvPath.string().c_str());
+	if (DefinitionCsvPath.empty())
+	{
+		LOG(LogLevel::Error) << "Could not find Hoi3 map/definition.csv";
+		return false;
+	}
+	if (false == ParseCsvFile(Definitions, DefinitionCsvPath.string().c_str()))
+	{
+		LOG(LogLevel::Error) << "Could not read " << DefinitionCsvPath.string();
+		return false;
+	}
 
 	for (auto Line : Definitions)
 	{
@@ -241,7 +300,14 @@ bool GetSides(std::vector< std::vector< std::string > >& Sides, Object* SaveFile
 		}
 		case Superpowers::Factions:
 		{
-			std::vector<Object*> Factions = SaveFile->getValue("faction")[0]->getLeaves();
+			auto FactionsObjects = SaveFile->getValue("faction");
+			if (FactionsObjects.empty())
+			{
+				LOG(LogLevel::Error) << "Could not find factions in the save file.";
+				return false;
+			}
+
+			std::vector<Object*> Factions = FactionsObjects[0]->getLeaves();
 			std::vector<std::string> Added;
 			int i = 0;
 			for (; i < 3; i++)
@@ -250,7 +316,6 @@ bool GetSides(std::vector< std::vector< std::string > >& Sides, Object* SaveFile
 				{
 					if (CountryLeaf->getKey() == "country")
 					{
-						std::cout << CountryLeaf->getLeaf() << std::endl;
 						Sides[i].push_back(CountryLeaf->getLeaf());
 						Added.push_back(CountryLeaf->getLeaf());
 					}
@@ -290,11 +355,40 @@ bool CreateTerritoryMaps(std::vector< std::vector< std::string > >& Sides, std::
 	boost::filesystem::path CoastlinesPath = Config.GetOutputPath() / "data" / "earth" / "coastlines.bmp";
 
 	CImg<unsigned char> Landbase(LandbasePath.string().c_str());
+	if (NULL == Landbase)
+	{
+		LOG(LogLevel::Error) << "Could not open " + LandbasePath.string();
+		return false;
+	}
+
 	CImg<unsigned char> Sailable(SailablePath.string().c_str());
+	if (NULL == Sailable)
+	{
+		LOG(LogLevel::Error) << "Could not open " + SailablePath.string();
+		return false;
+	}
+
 	CImg<unsigned char> Coastlines(CoastlinesPath.string().c_str());
+	if (NULL == Coastlines)
+	{
+		LOG(LogLevel::Error) << "Could not open " + CoastlinesPath.string();
+		return false;
+	}
 
 	boost::filesystem::path HoiProvinceMapPath = Config.GetModdedHoi3File("map/provinces.bmp");
+	if (HoiProvinceMapPath.empty())
+	{
+		LOG(LogLevel::Error) << "Could not find Hoi3 map/provinces.bmp";
+		return false;
+	}
+
 	CImg<unsigned char> ProvinceMapFromFile(HoiProvinceMapPath.string().c_str());
+	if (NULL == ProvinceMapFromFile)
+	{
+		LOG(LogLevel::Error) << "Could not open " + HoiProvinceMapPath.string();
+		return false;
+	}
+
 	ProvinceMapFromFile.resize(512, 200, 1, 3, 1);
 	ProvinceMapFromFile.mirror('y');
 
@@ -302,7 +396,6 @@ bool CreateTerritoryMaps(std::vector< std::vector< std::string > >& Sides, std::
 	ProvinceMap.draw_image(0, 26, ProvinceMapFromFile);
 
 	std::vector< std::tuple< std::vector<std::string>, CImg<unsigned char>, CImg<unsigned char> > > TerritoryMaps;
-	//std::vector< std::string > RelevantTags;
 	for (int i = 0; i < 6; i++)
 	{
 		TerritoryMaps.push_back(
@@ -374,11 +467,24 @@ bool CreateTerritoryMaps(std::vector< std::vector< std::string > >& Sides, std::
 	return true;
 }
 
-void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
+bool CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std::map<int, std::string>& Territories)
 {
 	Configuration& Config = Configuration::Get();
 	boost::filesystem::path BigHoiProvinceMapPath = Config.GetModdedHoi3File("map/provinces.bmp");
+	if (BigHoiProvinceMapPath.empty())
+	{
+		LOG(LogLevel::Error) << "Could not find Hoi3 map/provinces.bmp .";
+		LOG(LogLevel::Error) << "But it was perfectly fine earlier. Now I'm confused.";
+		return false;
+	}
+
 	CImg<unsigned char> BigProvinceMap(BigHoiProvinceMapPath.string().c_str());
+	if (NULL == BigProvinceMap)
+	{
+		LOG(LogLevel::Error) << "Could not read " + BigHoiProvinceMapPath.string();
+		LOG(LogLevel::Error) << "But it was perfectly fine earlier. Now I'm confused.";
+		return false;
+	}
 
 	BigProvinceMap.mirror('y');
 
@@ -422,8 +528,6 @@ void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std
 		}
 	}
 
-	std::cout << BigProvinceMap.width() << "\t" << BigProvinceMap.height() << std::endl;
-
 	const unsigned char black[] = { 0, 0, 0 };
 	BigProvinceMap.draw_fill(0, 0, black);
 
@@ -437,7 +541,6 @@ void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std
 
 			if (real_rand() > 0.0002) continue;
 
-			std::cout << x << "\t" << y << std::endl;
 			const unsigned char newcolour[] = {
 				BigProvinceMap(x, y, 0, 0) + (10.0 * real_rand()) - 5.0,
 				BigProvinceMap(x, y, 0, 1) + (10.0 * real_rand()) - 5.0,
@@ -449,14 +552,26 @@ void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std
 
 	//
 
-	GetEdges Edges;
-	Edges.Init(&BigProvinceMap);
 
 	std::set< std::tuple<int, int, int> > GotColours;
-	Edges.GetAllColours(GotColours);
+	GetEdges Edges;
+	if (false == Edges.Init(&BigProvinceMap))
+	{
+		LOG(LogLevel::Warning) << "Could not read country edges. This map will look kinda blank.";
+	}
+	else
+	{
+		 Edges.GetAllColours(GotColours);
+	}
 
 	boost::filesystem::path InternationalDatPath = Config.GetOutputPath() / "data" / "earth" / "international.dat";
 	std::ofstream InternationalDat(InternationalDatPath.string().c_str());
+
+	if (!InternationalDat)
+	{
+		LOG(LogLevel::Error) << "Could not write to " << InternationalDatPath.string();
+		return false;
+	}
 
 	bool lastB = false;
 	for (auto GotColour : GotColours)
@@ -488,40 +603,56 @@ void CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std
 	}
 
 	InternationalDat.close();
+	return true;
 }
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	LOG(LogLevel::Info) << "Loading configuration...";
 	Configuration& Config = Configuration::Get();
-	Config.Init("configuration.txt");
+	if (false == Config.Init("configuration.txt"))
+	{
+		LOG(LogLevel::Error) << "Could not load configuration. Exiting.";
+		return 1;
+	}
 
+	LOG(LogLevel::Info) << "Loading save file " << Config.GetSavePath().string() << " ...";
 	Object* SaveFile = doParseFile(Config.GetSavePath().string().c_str());
 
-#ifdef _DEBUG
-	std::vector< std::vector< std::string > > Sideses;
-	std::vector<pair<std::string, int>> SortedTerritoryCountses;
+	if (nullptr == SaveFile)
+	{
+		LOG(LogLevel::Error) << "Could not load save file. Exiting.";
+		return 1;
+	}
 
-	SortedTerritoryCountses.push_back(std::make_pair("SOV",3));
-	SortedTerritoryCountses.push_back(std::make_pair("ABC", 3));
-	SortedTerritoryCountses.push_back(std::make_pair("DEF", 3));
-	SortedTerritoryCountses.push_back(std::make_pair("GHI", 3));
-	SortedTerritoryCountses.push_back(std::make_pair("JKL", 3));
+	LOG(LogLevel::Info) << "Creating mod folder structure...";
+	if (false == Config.CreateDirectories())
+	{
+		LOG(LogLevel::Error) << "Could not create mod folder structure. Exiting.";
+		return 1;
+	}
 
-	GetSides(Sideses, SaveFile, SortedTerritoryCountses);
-	return 0;
-#endif
-
-	Config.CreateDirectories();
-
-	std::map< int, std::pair<double, double> > ProvincePositions;
-	GetProvincePositions(ProvincePositions);
-	
 	std::map<int, std::string> Territories;
 	std::map<std::string, int> TerritoryCounts;
 	std::map<int, double> CityScore;
 	std::map<int, bool> Capitals;
-	GetProvinceNumbers(Territories, TerritoryCounts, CityScore, Capitals, SaveFile);
-	
+
+	LOG(LogLevel::Info) << "Reading save file contents...";
+	if (false == GetProvinceNumbers(Territories, TerritoryCounts, CityScore, Capitals, SaveFile))
+	{
+		LOG(LogLevel::Error) << "Could not understand the save file. Exiting.";
+		return 1;
+	}
+
+	std::map< int, std::pair<double, double> > ProvincePositions;
+
+	LOG(LogLevel::Info) << "Getting province coordinates...";
+	if (false == GetProvincePositions(ProvincePositions))
+	{
+		LOG(LogLevel::Error) << "Could not get province coordinates. Exiting.";
+		return 1;
+	}
+
 	std::vector<pair<std::string, int>> SortedTerritoryCounts;
 	for (auto itr = TerritoryCounts.begin(); itr != TerritoryCounts.end(); ++itr)
 		SortedTerritoryCounts.push_back(*itr);
@@ -545,18 +676,56 @@ int _tmain(int argc, _TCHAR* argv[])
 	);
 
 	std::map<ColourTriplet, int> ColourToId;
-	GetProvinceColourIds(ColourToId);
+	LOG(LogLevel::Info) << "Reading the province map...";
+	if (false == GetProvinceColourIds(ColourToId))
+	{
+		LOG(LogLevel::Error) << "Could not understand the province map. Exiting.";
+		return 1;
+	}
 
 	std::map<int, std::string> ProvinceNames;
 	std::map<std::string, std::string> CountryNames;
-	GetLocalisation(ProvinceNames, CountryNames);
+
+	LOG(LogLevel::Info) << "Reading names from localization...";
+	if (false == GetLocalisation(ProvinceNames, CountryNames))
+	{
+		LOG(LogLevel::Error) << "No comprende. Exiting.";
+		return 1;
+	}
 
 	std::vector< std::vector< std::string > > Sides;
-	GetSides(Sides, SaveFile, SortedTerritoryCounts);
 
-	CreateCitiesFile(SortedCityScores, Territories, CountryNames, ProvinceNames, ProvincePositions, Capitals);
-	CreateTerritoryMaps(Sides,ColourToId,Territories);
-	CreateInternationalBoundaries(ColourToId, Territories);
+	LOG(LogLevel::Info) << "Taking sides...";
+	if (false == GetSides(Sides, SaveFile, SortedTerritoryCounts))
+	{
+		LOG(LogLevel::Error) << "Could not assign sides. Exiting.";
+		return 1;
+	}
 
+	LOG(LogLevel::Info) << "Creating cities file...";
+	if (false == CreateCitiesFile(SortedCityScores, Territories, CountryNames, ProvinceNames, ProvincePositions, Capitals))
+	{
+		LOG(LogLevel::Error) << "Could not create cities.dat . Exiting.";
+		return 1;
+	}
+
+	LOG(LogLevel::Info) << "Creating territory maps...";
+	if (false == CreateTerritoryMaps(Sides, ColourToId, Territories))
+	{
+		LOG(LogLevel::Error) << "Could not create territory maps. Exiting.";
+		return 1;
+	}
+
+	LOG(LogLevel::Info) << "Drawing international boundaries...";
+	if (false == CreateInternationalBoundaries(ColourToId, Territories))
+	{
+		LOG(LogLevel::Error) << "Could not create international.dat . Exiting.";
+		return 1;
+	}
+
+	// TODO copy mod into Defcon
+
+	LOG(LogLevel::Info) << "Complete!";
 	return 0;
 }
+

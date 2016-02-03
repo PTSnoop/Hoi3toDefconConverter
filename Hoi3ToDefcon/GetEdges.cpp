@@ -22,7 +22,7 @@ GetEdges::GetEdges()
 bool GetEdges::Init(CImg<unsigned char>* texture)
 {
 	m_texture = texture;
-	return (NULL == m_texture);
+	return (NULL != m_texture);
 }
 
 GetEdges::~GetEdges()

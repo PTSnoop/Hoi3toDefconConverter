@@ -5,6 +5,8 @@
 
 #include <boost/icl/type_traits/is_numeric.hpp>
 
+#include "Log.h"
+
 bool is_number(const std::string& s)
 {
 	return !s.empty() && std::find_if(s.begin(), s.end(), [](char c) { return !std::isdigit(c); }) == s.end();
@@ -24,30 +26,27 @@ bool copyDir(
 			!fs::is_directory(source)
 			)
 		{
-			std::cerr << "Source directory " << source.string()
-				<< " does not exist or is not a directory." << '\n'
-				;
+			LOG(LogLevel::Error) << "Source directory " << source.string()
+				<< " does not exist or is not a directory.";
 			return false;
 		}
 		if (fs::exists(destination))
 		{
-			std::cerr << "Destination directory " << destination.string()
-				<< " already exists." << '\n'
-				;
+			LOG(LogLevel::Error) << "Destination directory " << destination.string()
+				<< " already exists.";
 			return false;
 		}
 		// Create the destination directory
 		if (!fs::create_directory(destination))
 		{
-			std::cerr << "Unable to create destination directory"
-				<< destination.string() << '\n'
-				;
+			LOG(LogLevel::Error) << "Unable to create destination directory"
+				<< destination.string();
 			return false;
 		}
 	}
 	catch (fs::filesystem_error const & e)
 	{
-		std::cerr << e.what() << '\n';
+		LOG(LogLevel::Error) << e.what();
 		return false;
 	}
 	// Iterate through the source directory
@@ -83,7 +82,7 @@ bool copyDir(
 		}
 		catch (fs::filesystem_error const & e)
 		{
-			std::cerr << e.what() << '\n';
+			LOG(LogLevel::Error) << e.what();
 		}
 	}
 	return true;
