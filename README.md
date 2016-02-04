@@ -29,11 +29,14 @@ Paradox-save-format parser and logging code taken from the other [Paradox Game C
 
 # Screenshots
 
-![Alternate History](http://imgur.com/aIm08qO)
+![Alternate History](http://imgur.com/aIm08qO.png)
+
 If 1941 had nukes: Axis v Allies v Comintern.
 
-![Border Gore](http://imgur.com/VGRVcYS)
+![Border Gore](http://imgur.com/VGRVcYS.png)
+
 Can cope with all sorts of crazy borders.
 
-![Unexpected Finland](http://imgur.com/o6gr9Gd)
+![Unexpected Finland](http://imgur.com/o6gr9Gd.png)
+
 Unlikely superpowers: Kola, Kimak, and the Kingdom of America.
