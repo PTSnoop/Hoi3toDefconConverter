@@ -8,6 +8,9 @@ The Hoi3 to Defcon converter takes save files from the World War 2 strategy game
 
 To use the converter, edit configuration.txt to add the correct paths and options (explained therein), then run Hoi3ToDefcon.exe .
 
+Using CImg (CeCILL-licensed) for image-wrangling. Paradox-save-format parser and logging code taken from the other [Paradox Game Converters](https://github.com/Idhrendur/paradoxGameConverters), used under MIT licence.
+
+
 ---
 
 # Features
@@ -23,9 +26,8 @@ To use the converter, edit configuration.txt to add the correct paths and option
 * Should work with pretty much all Hoi3 mods, including ones that change the map - but only one mod at a time. And I've only tested it on mods from the [V2 to HoI3 Converter](https://forum.paradoxplaza.com/forum/index.php?threads/v2-to-hoi3-converter-mod.582798/), so your mileage may vary.
 * All players start off with equal populations and units, regardless of industrial capacity or land covered. There's no way of changing this without delving into the DEFCON source code itself.
 * DEFCON has no save games, so there's no way we'll be able to create a converter further up the Paradox timeline from DEFCON to Stellaris. I suppose you'll have to go Hoi4->Stellaris, and leave DEFCON as a non-canon what-could-have-happened option.
+* No Mac builds. You should be able to compile it yourself, though.
 * Probably doesn't support Hearts Of Iron 4. Yet.
-
-Paradox-save-format parser and logging code taken from the other [Paradox Game Converters](https://github.com/Idhrendur/paradoxGameConverters), used under MIT licence.
 
 # Screenshots
 
