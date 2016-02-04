@@ -1,6 +1,8 @@
 // Hoi3ToDefcon.cpp : Defines the entry point for the console application.
 //
 
+#define VERSION "v1.0"
+
 #include "stdafx.h"
 
 #include <algorithm>
@@ -606,6 +608,69 @@ bool CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std
 	return true;
 }
 
+bool CreateModTxt()
+{
+	Configuration& Config = Configuration::Get();
+	boost::filesystem::path OutputPath = Config.GetOutputPath();
+
+	std::string sName = OutputPath.filename().string();
+
+	boost::filesystem::path ModTxtPath = Config.GetOutputPath() / "mod.txt";
+	std::ofstream ModTxt(ModTxtPath.string().c_str());
+	if (!ModTxt)
+	{
+		LOG(LogLevel::Error) << "Could not write to " << ModTxtPath.string();
+		return false;
+	}
+
+	ModTxt << "Name         " << "Converted - " << sName << std::endl;
+	ModTxt << "Version      " << VERSION << std::endl;
+	ModTxt << "Author       " << "PTSnoop" << std::endl;
+	ModTxt << "Website      " << "https://github.com/PTSnoop/Hoi3toDefconConverter" << std::endl;
+	ModTxt << "Comment      " << "This mod was created using the Hearts Of Iron 3 to Defcon converter." << std::endl;
+
+	ModTxt.close();
+	return true;
+}
+
+bool CopyModIntoDefcon()
+{
+	Configuration& Config = Configuration::Get();
+	boost::filesystem::path OutputPath = Config.GetOutputPath();
+	boost::filesystem::path DefconPath = Config.GetDefconPath();
+
+	if (DefconPath.empty())
+		return true;
+
+	boost::filesystem::path DefconModPath = DefconPath / "mods";
+	if (false == boost::filesystem::exists(DefconModPath))
+	{
+		if (false == boost::filesystem::create_directories(DefconModPath))
+		{
+			LOG(LogLevel::Error) << "Could not create directory " << DefconModPath.string();
+			return false;
+		}
+	}
+
+	boost::filesystem::path Name = OutputPath.filename();
+	DefconModPath = DefconModPath / Name;
+
+	boost::filesystem::remove_all(DefconModPath);
+	if (exists(DefconModPath))
+	{
+		LOG(LogLevel::Error) << "Could not overwrite preexisting Defcon mod " << DefconModPath.string();
+		return false;
+	}
+
+	if (false == copyDir(OutputPath, DefconModPath))
+	{
+		LOG(LogLevel::Error) << "Could not create " << DefconModPath.string();
+		return false;
+	}
+
+	return true;
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {
 	LOG(LogLevel::Info) << "Loading configuration...";
@@ -723,7 +788,21 @@ int _tmain(int argc, _TCHAR* argv[])
 		return 1;
 	}
 
-	// TODO copy mod into Defcon
+	LOG(LogLevel::Info) << "Creating mod information file...";
+	if (false == CreateModTxt())
+	{
+		LOG(LogLevel::Error) << "Could not create mod.txt .";
+		return 1;
+	}
+	
+	if (false == Config.GetDefconPath().empty())
+	{
+		LOG(LogLevel::Info) << "Copying into the Defcon mod directory...";
+		if (false == CopyModIntoDefcon())
+		{
+			LOG(LogLevel::Warning) << "Could not copy the mod into the Defcon directory.";
+		}
+	}
 
 	LOG(LogLevel::Info) << "Complete!";
 	return 0;

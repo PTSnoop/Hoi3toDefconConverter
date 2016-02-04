@@ -174,6 +174,7 @@ boost::filesystem::path Configuration::GetModdedHoi3File(boost::filesystem::path
 boost::filesystem::path Configuration::GetSavePath() { return m_SavePath; }
 boost::filesystem::path Configuration::GetHoi3Path() { return m_Hoi3Path; }
 boost::filesystem::path Configuration::GetHoi3ModPath() { return m_Hoi3ModPath; }
+boost::filesystem::path Configuration::GetDefconPath() { return m_DefconPath; }
 boost::filesystem::path Configuration::GetBaseModPath() { return m_BaseModPath; }
 boost::filesystem::path Configuration::GetOutputPath() { return m_OutputPath; }
 Superpowers Configuration::GetSuperpowerOption() { return m_SuperpowerOption; };

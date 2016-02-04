@@ -20,6 +20,7 @@ public:
 	boost::filesystem::path GetSavePath();
 	boost::filesystem::path GetHoi3Path();
 	boost::filesystem::path GetHoi3ModPath();
+	boost::filesystem::path GetDefconPath();
 	boost::filesystem::path GetBaseModPath();
 	boost::filesystem::path GetOutputPath();
 
