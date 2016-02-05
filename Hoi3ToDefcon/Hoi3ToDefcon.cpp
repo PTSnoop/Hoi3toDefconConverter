@@ -12,6 +12,7 @@
 #include <random>
 
 #define BOOST_NO_SCOPED_ENUMS
+#define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 
 #include "CImg.h"

@@ -3,6 +3,7 @@
 #include <string>
 
 #define BOOST_NO_SCOPED_ENUMS
+#define BOOST_NO_CXX11_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 
 enum Superpowers {Powerful, Factions, Custom};
