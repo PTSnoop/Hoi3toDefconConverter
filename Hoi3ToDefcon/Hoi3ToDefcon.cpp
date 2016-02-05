@@ -10,7 +10,8 @@
 #include <fstream>
 #include <map>
 #include <random>
-#include <boost/icl/type_traits/is_numeric.hpp>
+
+#define BOOST_NO_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 
 #include "CImg.h"
@@ -96,7 +97,10 @@ bool GetProvinceNumbers(std::map<int, std::string>& Territories, std::map<std::s
 	if (is_number(sSeed))
 	{
 		int iSeed = atoi(sSeed.c_str());
+#ifdef MSC_VER
+		//This line doesn't work on GCC, and I don't have time to figure out why not.
 		real_rand = std::bind(std::uniform_real_distribution<double>(0.0, 1.0), mt19937(iSeed));
+#endif
 	}
 
 	std::vector<Object*> Leaves = SaveFile->getLeaves();
@@ -544,9 +548,9 @@ bool CreateInternationalBoundaries(std::map<ColourTriplet, int>& ColourToId, std
 			if (real_rand() > 0.0002) continue;
 
 			const unsigned char newcolour[] = {
-				BigProvinceMap(x, y, 0, 0) + (10.0 * real_rand()) - 5.0,
-				BigProvinceMap(x, y, 0, 1) + (10.0 * real_rand()) - 5.0,
-				BigProvinceMap(x, y, 0, 2) + (10.0 * real_rand()) - 5.0
+				BigProvinceMap(x, y, 0, 0) + floor((10.0 * real_rand()) - 5.0),
+				BigProvinceMap(x, y, 0, 1) + floor((10.0 * real_rand()) - 5.0),
+				BigProvinceMap(x, y, 0, 2) + floor((10.0 * real_rand()) - 5.0)
 			};
 			BigProvinceMap.draw_fill(x, y, newcolour);
 		}
@@ -671,7 +675,8 @@ bool CopyModIntoDefcon()
 	return true;
 }
 
-int _tmain(int argc, _TCHAR* argv[])
+//int _tmain(int argc, _TCHAR* argv[])
+int main()
 {
 	LOG(LogLevel::Info) << "Loading configuration...";
 	Configuration& Config = Configuration::Get();
@@ -725,7 +730,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	sort(
 		SortedTerritoryCounts.begin(), 
 		SortedTerritoryCounts.end(), 
-		[=](pair<std::string, int>& a, pair<std::string, int>& b)
+		[=](const pair<std::string, int>& a, const pair<std::string, int>& b)
 			{ return a.second > b.second; }
 	);
 
@@ -736,7 +741,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	sort(
 		SortedCityScores.begin(), 
 		SortedCityScores.end(), 
-		[=](pair<int, double>& a, pair<int, double>& b)
+		[=](const pair<int, double>& a, const pair<int, double>& b)
 			{ return a.second > b.second; }
 	);
 

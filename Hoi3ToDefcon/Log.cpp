@@ -27,7 +27,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 #include <fstream>
 #include <iostream>
 
+#ifdef _MSC_VER
 #include <Windows.h>
+#endif
 
 Log::Log(LogLevel level)
 : logLevel(level)
@@ -55,6 +57,7 @@ void Log::WriteToConsole(LogLevel level, const std::string& logMessage)
 		return;
 	}
 
+#ifdef _MSC_VER
 	HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);	// a handle to the console window
 	if (console != INVALID_HANDLE_VALUE)
 	{
@@ -91,14 +94,21 @@ void Log::WriteToConsole(LogLevel level, const std::string& logMessage)
 			return;
 		}
 	}
+#endif
 
 	std::cout << logMessage;
+	
+#ifndef _MSC_VER
+	std::cout << std::endl;
+#endif
 }
 
 void Log::WriteToFile(LogLevel level, const std::string& logMessage)
 {
 	std::ofstream logFile("log.txt", std::ofstream::app);
 
+#ifdef _MSC_VER
+	std::cout << std::endl;
 	time_t rawtime;	// the raw time data
 	time(&rawtime);
 	tm timeInfo;		// the processed time data
@@ -112,6 +122,7 @@ void Log::WriteToFile(LogLevel level, const std::string& logMessage)
 			logFile << timeBuffer;
 		}
 	}
+#endif
 
 	switch (level)
 	{

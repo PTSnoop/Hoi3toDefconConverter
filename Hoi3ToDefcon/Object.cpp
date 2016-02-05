@@ -51,6 +51,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.*/
 #include <iostream>
 #include <assert.h>
 
+#ifndef _MSC_VER
+#define sprintf_s snprintf
+#endif
 
 
 Object::Object(string k) :

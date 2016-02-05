@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+
+#define BOOST_NO_SCOPED_ENUMS
 #include <boost/filesystem.hpp>
 
 enum Superpowers {Powerful, Factions, Custom};
