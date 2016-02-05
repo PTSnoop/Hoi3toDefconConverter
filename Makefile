@@ -1,5 +1,5 @@
 LD_FLAGS := -lboost_system -lboost_thread -lboost_filesystem -O2 -L/usr/X11R6/lib -lm -lX11 -lpthread
-CC_FLAGS := -std=c++11 -w
+CC_FLAGS := -std=c++11
 
 INCLUDE_DIRS := $(shell echo "-I"`find Hoi3ToDefcon/ -type d | tr "\\n" ":" | sed 's/:/ -I/g'`.)
 
